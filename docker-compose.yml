@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: calebs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/calebs
+      SECRET_KEY: dev-secret-change-me
+      DEBUG: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth:
+    build: ./auth
+    ports:
+      - "8001:8001"
+    environment:
+      SECRET_KEY: dev-secret-change-me
+      PORT: "8001"
+
+  realtime:
+    build: ./realtime
+    ports:
+      - "9000:9000"
+    environment:
+      PORT: "9000"
+
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:9000
+    depends_on:
+      - api
+      - realtime
+
+volumes:
+  postgres_data:
